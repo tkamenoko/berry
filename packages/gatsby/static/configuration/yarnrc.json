@@ -104,7 +104,7 @@
     },
     "enableGlobalCache": {
       "_package": "@yarnpkg/core",
-      "description": "If true, Yarn will disregard the `cacheFolder` settings and will store the cache files into a folder shared by all local projects sharing the same configuration. Note that enabling the global cache isn't advised on OSX: it opens the door to some subtle incompatibilities while not providing significant size improvements (this is because the OSX default filesystem supports Copy-on-Write, so each file in your cache is already a light pointer to a single global file).",
+      "description": "If true, Yarn will disregard the `cacheFolder` settings and will store the cache files into a folder shared by all local projects sharing the same configuration.",
       "type": "boolean",
       "default": false
     },
@@ -277,6 +277,11 @@
             "description": "Selects exactly one message that must match the given text. In case a message matches both `code`-based and `text`-based filters, the `text`-based ones will take precedence over the `code`-based ones.",
             "examples": ["lorem-ipsum@npm:1.2.3 lists build scripts, but its build has been explicitly disabled through configuration"]
           },
+          "pattern": {
+            "type": "string",
+            "description": "Selects exactly one message that must match the given glob pattern. In case a message matches both `pattern`-based and `code`-based filters, the `pattern`-based ones will take precedence over the other ones. Patterns can be overriden on a case-by-case basis by using the `text` filter, which has precedence over `pattern`.",
+            "examples": ["lorem-ipsum@* lists build scripts, but its build has been explicitly disabled through configuration"]
+          },
           "level": {
             "description": "Applies the specified log level to all selected messages. Can be one of `info`, `warning`, `error`, or `discard` if you wish to hide those messages altogether.",
             "examples": ["error"],
@@ -303,6 +308,10 @@
         {
           "text": "lorem-ipsum@npm:1.2.3 lists build scripts, but its build has been explicitly disabled through configuration",
           "level": "error"
+        },
+        {
+          "pattern": "lorem-ipsum@* lists build scripts, but its build has been explicitly disabled through configuration",
+          "level": "error"
         }
       ]
     },
@@ -315,9 +324,9 @@
     },
     "networkConcurrency": {
       "_package": "@yarnpkg/core",
-      "description": "Defines how many requests are allowed to run at the same time. By default Yarn doesn't put limits on it, but it may sometimes be required when working behind proxies that don't handle large amounts of requests very well.",
+      "description": "Defines how many requests are allowed to run at the same time. Yarn defaults to 50 concurrent requests but it may be required to limit it even more when working behind proxies that can't handle large amounts of concurrent requests.",
       "type": "number",
-      "default": "Infinity",
+      "default": 50,
       "examples": [8]
     },
     "networkSettings": {
@@ -342,20 +351,20 @@
               "$ref": "#/properties/httpsProxy"
             }
           },
-          "_exampleKeys": ["caFilePath"]
+          "_exampleKeys": ["caFilePath", "enableNetwork", "httpProxy", "httpsProxy"]
         }
       },
       "_exampleKeys": ["*.example.com"]
     },
     "nmHoistingLimits": {
-      "_package": "@yarnpkg/plugin-node-modules",
+      "_package": "@yarnpkg/plugin-nm",
       "description": "Defines the highest point where packages can be hoisted. One of `workspaces` (don't hoist packages past the workspace that depends on them), `dependencies` (packages aren't hoisted past the direct dependencies for each workspace), or `none` (the default, packages are hoisted as much as possible). This setting can be overriden per-workspace through the [`installConfig.hoistingLimits` field](/configuration/manifest#installConfig.hoistingLimits).",
       "type": "string",
       "enum": ["workspaces", "dependencies", "none"],
       "default": "none"
     },
     "nmMode": {
-      "_package": "@yarnpkg/plugin-node-modules",
+      "_package": "@yarnpkg/plugin-nm",
       "description": "If set to `hardlinks-local` Yarn will utilize hardlinks to reduce disk space consumption inside `node_modules` directories in a current project. With `hardlinks-global` Yarn will use global content addressable storage to reduce `node_modules` size across all the projects using this option.",
       "type": "string",
       "enum": ["classic", "hardlinks-local", "hardlinks-global"],
@@ -490,29 +499,6 @@
               "additionalProperties": false,
               "_exampleKeys": ["lodash"]
             },
-            "dependenciesMeta": {
-              "type": "object",
-              "patternProperties": {
-                "^(?:@([^/]+?)/)?([^/]+?)$": {
-                  "type": "object",
-                  "properties": {
-                    "built": {
-                      "type": "boolean",
-                      "examples": [false]
-                    },
-                    "optional": {
-                      "type": "boolean",
-                      "examples": [false]
-                    },
-                    "unplugged": {
-                      "type": "boolean",
-                      "examples": [true]
-                    }
-                  }
-                }
-              },
-              "additionalProperties": false
-            },
             "peerDependencies": {
               "type": "object",
               "patternProperties": {
@@ -535,13 +521,15 @@
                       "type": "boolean",
                       "examples": [true]
                     }
-                  }
+                  },
+                  "_exampleKeys": ["optional"]
                 }
               },
-              "additionalProperties": false
+              "additionalProperties": false,
+              "_exampleKeys": ["webpack-cli"]
             }
           },
-          "_exampleKeys": ["dependencies", "peerDependencies"],
+          "_exampleKeys": ["dependencies", "peerDependencies", "peerDependenciesMeta"],
           "_margin": false
         }
       },

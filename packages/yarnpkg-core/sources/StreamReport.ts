@@ -31,7 +31,7 @@ const GROUP = process.env.GITHUB_ACTIONS
   : process.env.TRAVIS
     ? {start: (what: string) => `travis_fold:start:${what}\n`, end: (what: string) => `travis_fold:end:${what}\n`}
     : process.env.GITLAB_CI
-      ? {start: (what: string) => `section_start:${Math.floor(Date.now() / 1000)}:${what.toLowerCase().replace(/\W+/g, `_`)}\r\x1b[0K${what}\n`, end: (what: string) => `section_end:${Math.floor(Date.now() / 1000)}:${what.toLowerCase().replace(/\W+/g, `_`)}\r\x1b[0K`}
+      ? {start: (what: string) => `section_start:${Math.floor(Date.now() / 1000)}:${what.toLowerCase().replace(/\W+/g, `_`)}[collapsed=true]\r\x1b[0K${what}\n`, end: (what: string) => `section_end:${Math.floor(Date.now() / 1000)}:${what.toLowerCase().replace(/\W+/g, `_`)}\r\x1b[0K`}
       : null;
 
 const now = new Date();
@@ -243,7 +243,7 @@ export class StreamReport extends Report {
       this.reportInfo(null, `┌ ${what}`);
       this.indent += 1;
 
-      if (GROUP !== null && !this.json) {
+      if (GROUP !== null && !this.json && this.includeInfos) {
         this.stdout.write(GROUP.start(what));
       }
     }};
@@ -269,7 +269,7 @@ export class StreamReport extends Report {
       if (mark.committed) {
         this.indent -= 1;
 
-        if (GROUP !== null && !this.json)
+        if (GROUP !== null && !this.json && this.includeInfos)
           this.stdout.write(GROUP.end(what));
 
         if (this.configuration.get(`enableTimers`) && after - before > 200) {
@@ -291,7 +291,7 @@ export class StreamReport extends Report {
       this.reportInfo(null, `┌ ${what}`);
       this.indent += 1;
 
-      if (GROUP !== null && !this.json) {
+      if (GROUP !== null && !this.json && this.includeInfos) {
         this.stdout.write(GROUP.start(what));
       }
     }};
@@ -317,7 +317,7 @@ export class StreamReport extends Report {
       if (mark.committed) {
         this.indent -= 1;
 
-        if (GROUP !== null && !this.json)
+        if (GROUP !== null && !this.json && this.includeInfos)
           this.stdout.write(GROUP.end(what));
 
         if (this.configuration.get(`enableTimers`) && after - before > 200) {

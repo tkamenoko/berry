@@ -260,7 +260,7 @@ describe(`Plug'n'Play`, () => {
 
         expect(filter(rootMessage)).not.toEqual(filter(dependencyMessage));
       },
-    )
+    ),
   );
 
   test(
@@ -287,7 +287,7 @@ describe(`Plug'n'Play`, () => {
 
         expect(filter(workspaceMessage)).toEqual(filter(rootMessage));
       },
-    )
+    ),
   );
 
   test(
@@ -323,8 +323,8 @@ describe(`Plug'n'Play`, () => {
           name: `@types/no-deps`,
           version: `1.0.0`,
         });
-      }
-    )
+      },
+    ),
   );
 
   test(
@@ -404,7 +404,7 @@ describe(`Plug'n'Play`, () => {
       async ({path, run, source}) => {
         const {stdout} = await run(`install`);
         expect(stdout).not.toEqual(expect.stringContaining(`YN0060`));
-      }
+      },
     ),
   );
 
@@ -649,7 +649,7 @@ describe(`Plug'n'Play`, () => {
               `${npath.fromPortablePath(path)}/workspace-b`,
               ``,
             ])}}))`,
-            {cwd: `${path}/workspace-a`}
+            {cwd: `${path}/workspace-a`},
           ),
         ).resolves.toMatchObject({
           name: `no-deps`,
@@ -1704,6 +1704,8 @@ describe(`Plug'n'Play`, () => {
       await mkdirp(`${path}/foo`);
       await writeFile(`${path}/foo/index.js`, ``);
 
+      await run(`install`);
+
       await expect(source(`require.resolve('./foo')`)).resolves.toEqual(npath.fromPortablePath(`${path}/foo.js`));
       await expect(source(`require.resolve('./foo/')`)).resolves.toEqual(npath.fromPortablePath(`${path}/foo/index.js`));
     }),
@@ -1749,7 +1751,7 @@ describe(`Plug'n'Play`, () => {
 
         await xfs.writeFilePromise(
           `${portalTarget}/index.js`,
-          `module.exports = require.resolve('peer-deps-fixed', {paths: [__dirname]})`
+          `module.exports = require.resolve('peer-deps-fixed', {paths: [__dirname]})`,
         );
 
         await xfs.writeJsonPromise(`${path}/package.json`, {
@@ -1762,7 +1764,7 @@ describe(`Plug'n'Play`, () => {
 
         await expect(source(`require('portal')`)).resolves.toMatch(`peer-deps-fixed-virtual-`);
       });
-    })
+    }),
   );
 
   test(
@@ -1781,7 +1783,7 @@ describe(`Plug'n'Play`, () => {
 
         await xfs.writeFilePromise(
           `${portalTarget}/index.js`,
-          `module.exports = require.resolve('no-deps', {paths: [__dirname]})`
+          `module.exports = require.resolve('no-deps', {paths: [__dirname]})`,
         );
 
         await xfs.writeJsonPromise(`${path}/package.json`, {
@@ -1795,7 +1797,7 @@ describe(`Plug'n'Play`, () => {
 
         await expect(source(`require('portal')`)).resolves.toMatch(`no-deps-npm-2.0.0-`);
       });
-    })
+    }),
   );
 
   test(
@@ -1826,7 +1828,7 @@ describe(`Plug'n'Play`, () => {
           stderr: expect.stringContaining(`is controlled by multiple pnpapi instances`),
         });
       });
-    })
+    }),
   );
 
   test(
@@ -1840,7 +1842,7 @@ describe(`Plug'n'Play`, () => {
       await run(`install`);
 
       await expect(source(`require('./ignored/index.js')`)).resolves.toBe(42);
-    })
+    }),
   );
 
   test(
@@ -1865,7 +1867,7 @@ describe(`Plug'n'Play`, () => {
       await run(`install`);
 
       await expect(source(`require('./index.js')`)).resolves.toMatch(/no-deps(\\|\/)index.js/);
-    })
+    }),
   );
 
   test(
@@ -1880,8 +1882,8 @@ describe(`Plug'n'Play`, () => {
         await run(`install`);
 
         await expect(source(`require('module').findPnpApi(require('path').resolve('ignored'))`)).resolves.toBe(null);
-      }
-    )
+      },
+    ),
   );
 
   test(
@@ -1896,8 +1898,8 @@ describe(`Plug'n'Play`, () => {
         await run(`install`);
 
         await expect(source(`require('module').findPnpApi(require('path').resolve('ignored/node_modules/.cache'))`)).resolves.toBe(null);
-      }
-    )
+      },
+    ),
   );
 
   test(
@@ -1925,8 +1927,8 @@ describe(`Plug'n'Play`, () => {
           code: 0,
           stdout: expect.stringContaining(`YN0007`),
         });
-      }
-    )
+      },
+    ),
   );
 
   test(
@@ -1973,7 +1975,109 @@ describe(`Plug'n'Play`, () => {
           code: 0,
           stdout: `42\n`,
         });
-      }
-    )
+      },
+    ),
+  );
+
+  test(
+    `it should set bytesRead on Windows when input is a pipe and EOF is thrown`,
+    makeTemporaryEnv(
+      {
+        scripts: {
+          test: `echo '' | node index.js`,
+        },
+      },
+      async ({path, run, source}) => {
+        await expect(run(`install`)).resolves.toMatchObject({code: 0});
+
+        await xfs.writeFilePromise(`${path}/index.js`, `
+          const fs = require('fs');
+
+          fs.read(0, Buffer.alloc(10000), 0, 10000, null, (err, bytesRead, buffer) => {
+            console.log(bytesRead);
+            fs.read(0, Buffer.alloc(10000), 0, 10000, null, (err, bytesRead, buffer) => {
+              console.log(bytesRead);
+            });
+          });
+        `);
+
+        await expect(run(`test`)).resolves.toMatchObject({
+          code: 0,
+          stdout: `1\n0\n`,
+        });
+      },
+    ),
+  );
+
+  test(
+    `it should pick the most specific locator`,
+    makeTemporaryEnv(
+      { },
+      async ({path, run, source}) => {
+        await xfs.mkdirPromise(`${path}/sub-project`);
+        await xfs.writeJsonPromise(`${path}/sub-project/package.json`, {
+          dependencies: {
+            'no-deps': `1.0.0`,
+          },
+        });
+        await xfs.writeFilePromise(`${path}/sub-project/yarn.lock`, ``);
+
+        await expect(run(`install`, {cwd: `${path}/sub-project`})).resolves.toMatchObject({code: 0});
+        await expect(run(`install`)).resolves.toMatchObject({code: 0});
+
+        await xfs.writeFilePromise(`${path}/sub-project/index.js`, `
+          const path = require('path');
+          require.resolve('no-deps', {paths: [path.resolve(__dirname, '..'), __filename]});
+          require.resolve('no-deps', {paths: [path.resolve(__dirname, '..'), __filename]});
+        `);
+
+        await expect(run(`node`, `./index.js`, {cwd: `${path}/sub-project`})).resolves.toMatchObject({code: 0});
+      },
+    ),
+  );
+
+  test(
+    `it should load modules that haven't been loaded`,
+    makeTemporaryEnv(
+      { },
+      async ({path, run, source}) => {
+        await expect(run(`install`)).resolves.toMatchObject({code: 0});
+
+        await xfs.writeFilePromise(`${path}/foo.js`, `
+          module.exports.foo = 42;
+        `);
+        await xfs.writeFilePromise(`${path}/index.js`, `
+          import('./foo.js').then((mod) => console.log(mod.foo));
+        `);
+
+        await expect(run(`node`, `./index.js`)).resolves.toMatchObject({
+          code: 0,
+          stdout: `42\n`,
+        });
+      },
+    ),
+  );
+
+  test(
+    `it should support circular requires`,
+    makeTemporaryEnv(
+      { },
+      async ({path, run, source}) => {
+        await expect(run(`install`)).resolves.toMatchObject({code: 0});
+
+        await xfs.writeFilePromise(`${path}/foo.js`, `
+          module.exports.foo = 42;
+          require('./index.js');
+        `);
+        await xfs.writeFilePromise(`${path}/index.js`, `
+          console.log(require('./foo.js').foo);
+        `);
+
+        await expect(run(`node`, `./index.js`)).resolves.toMatchObject({
+          code: 0,
+          stdout: `42\n`,
+        });
+      },
+    ),
   );
 });

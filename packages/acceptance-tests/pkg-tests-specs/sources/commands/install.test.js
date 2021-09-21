@@ -20,20 +20,20 @@ describe(`Commands`, () => {
     );
 
     test(
-      `it should skip build scripts when using --skip-builds`,
+      `it should skip build scripts when using --mode=skip-build`,
       makeTemporaryEnv({
         dependencies: {
           [`no-deps-scripted`]: `1.0.0`,
         },
       }, async ({path, run, source}) => {
-        const {stdout} = await run(`install`, `--inline-builds`, `--skip-builds`);
+        const {stdout} = await run(`install`, `--inline-builds`, `--mode=skip-build`);
 
         await expect(stdout).toMatchSnapshot();
       }),
     );
 
     test(
-      `it shouldn't impact how artifacts are generated when using --skip-builds`,
+      `it shouldn't impact how artifacts are generated when using --mode=skip-build`,
       makeTemporaryEnv({
         dependencies: {
           [`no-deps-scripted`]: `1.0.0`,
@@ -46,7 +46,7 @@ describe(`Commands`, () => {
 
         await xfs.removePromise(pnpPath);
 
-        await run(`install`, `--skip-builds`);
+        await run(`install`, `--mode=skip-build`);
         const pnpFileWithoutBuilds = await xfs.readFilePromise(pnpPath);
 
         expect(pnpFileWithBuilds).toEqual(pnpFileWithoutBuilds);
@@ -91,7 +91,7 @@ describe(`Commands`, () => {
         await xfs.removePromise(`${path}/.yarn/cache`);
 
         await run(`install`, `--immutable`);
-      })
+      }),
     );
 
     test(
@@ -100,7 +100,7 @@ describe(`Commands`, () => {
         dependencies: {},
       }, async ({path, run, source}) => {
         await expect(run(`install`, `--immutable-cache`)).rejects.toThrowError(/Cache path does not exist/);
-      })
+      }),
     );
 
     test(
@@ -113,7 +113,7 @@ describe(`Commands`, () => {
         // Ensure the cache directory exists
         await xfs.mkdirPromise(`${path}/.yarn/cache`, {recursive: true});
         await expect(run(`install`, `--immutable-cache`)).rejects.toThrow(/YN0056/);
-      })
+      }),
     );
 
     test(
@@ -130,7 +130,7 @@ describe(`Commands`, () => {
         await xfs.mkdirPromise(`${path}/.yarn/cache`, {recursive: true});
 
         await expect(run(`install`, `--immutable-cache`)).rejects.toThrow(/YN0056/);
-      })
+      }),
     );
 
     test(
@@ -147,7 +147,7 @@ describe(`Commands`, () => {
         }, null, 2));
 
         await expect(run(`install`, `--immutable-cache`)).rejects.toThrow(/YN0056/);
-      })
+      }),
     );
 
     test(
@@ -226,8 +226,8 @@ describe(`Commands`, () => {
         },
         async ({path, run, source}) => {
           await expect(run(`install`)).resolves.toMatchSnapshot();
-        }
-      )
+        },
+      ),
     );
 
     test(
@@ -245,8 +245,8 @@ describe(`Commands`, () => {
           });
 
           await expect(run(`install`)).resolves.toMatchSnapshot();
-        }
-      )
+        },
+      ),
     );
 
     test(
@@ -272,8 +272,8 @@ describe(`Commands`, () => {
           });
 
           await expect(run(`install`)).resolves.toMatchSnapshot();
-        }
-      )
+        },
+      ),
     );
 
     test(
@@ -296,8 +296,8 @@ describe(`Commands`, () => {
 
           expect(code).toEqual(1);
           expect(stdout.match(/YN0009/g).length).toEqual(1);
-        }
-      )
+        },
+      ),
     );
 
     test(
@@ -314,8 +314,8 @@ describe(`Commands`, () => {
             code: 1,
             stdout: expect.not.stringContaining(`foo`),
           });
-        }
-      )
+        },
+      ),
     );
 
     test(
@@ -347,6 +347,39 @@ describe(`Commands`, () => {
         const {stdout} = await run(`install`, `--inline-builds`);
         expect(stdout).toMatch(/YN0005/g);
         expect(stdout).not.toMatch(/YN0004/g);
+      }),
+    );
+
+    test(
+      `it should fetch only required packages when using \`--mode=update-lockfile\``,
+      makeTemporaryEnv({
+        dependencies: {
+          [`one-fixed-dep`]: `1.0.0`,
+          [`no-deps`]: `1.0.0`,
+        },
+      }, async ({path, run, source}) => {
+        await run(`install`, `--mode=update-lockfile`);
+
+        const cacheBefore = await xfs.readdirPromise(`${path}/.yarn/cache`);
+        expect(cacheBefore.find(entry => entry.includes(`one-fixed-dep-npm-1.0.0`))).toBeDefined();
+        expect(cacheBefore.find(entry => entry.includes(`no-deps-npm-1.0.0`))).toBeDefined();
+
+        await xfs.writeJsonPromise(`${path}/package.json`, {
+          dependencies: {
+            [`one-fixed-dep`]: `1.0.0`,
+            [`no-deps`]: `2.0.0`,
+          },
+        });
+        await xfs.removePromise(`${path}/.yarn/cache`);
+        await xfs.mkdirPromise(`${path}/.yarn/cache`, {recursive: true});
+
+        const {code, stdout, stderr} = await run(`install`, `--mode=update-lockfile`);
+        await expect({code, stdout, stderr}).toMatchSnapshot();
+
+        const cacheAfter = await xfs.readdirPromise(`${path}/.yarn/cache`);
+        expect(cacheAfter.find(entry => entry.includes(`one-fixed-dep-npm-1.0.0`))).toBeUndefined();
+        expect(cacheAfter.find(entry => entry.includes(`no-deps-npm-1.0.0`))).toBeUndefined();
+        expect(cacheAfter.find(entry => entry.includes(`no-deps-npm-2.0.0`))).toBeDefined();
       }),
     );
   });

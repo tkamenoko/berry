@@ -51,6 +51,11 @@ const IGNORED_ENV_VARIABLES = new Set([
   // "wrapOutput" was a variable used to indicate nested "yarn run" processes
   // back in Yarn 1.
   `wrapOutput`,
+
+  // "YARN_HOME" and "YARN_CONF_DIR" may be present as part of the unrelated "Apache Hadoop YARN" software project.
+  // https://hadoop.apache.org/docs/r0.23.11/hadoop-project-dist/hadoop-common/SingleCluster.html
+  `home`,
+  `confDir`,
 ]);
 
 export const ENVIRONMENT_PREFIX = `yarn_`;
@@ -320,7 +325,7 @@ export const coreDefinitions: {[coreSettingName: string]: SettingsDefinition} = 
   networkConcurrency: {
     description: `Maximal number of concurrent requests`,
     type: SettingsType.NUMBER,
-    default: Infinity,
+    default: 50,
   },
   networkSettings: {
     description: `Network settings per hostname (glob patterns are supported)`,
@@ -379,6 +384,11 @@ export const coreDefinitions: {[coreSettingName: string]: SettingsDefinition} = 
         type: SettingsType.STRING,
         default: undefined,
       },
+      pattern: {
+        description: `Code of the patterns covered by this override`,
+        type: SettingsType.STRING,
+        default: undefined,
+      },
       level: {
         description: `Log level override, set to null to remove override`,
         type: SettingsType.STRING,
@@ -409,6 +419,11 @@ export const coreDefinitions: {[coreSettingName: string]: SettingsDefinition} = 
   // Settings related to security
   enableScripts: {
     description: `If true, packages are allowed to have install scripts by default`,
+    type: SettingsType.BOOLEAN,
+    default: true,
+  },
+  enableStrictSettings: {
+    description: `If true, unknown settings will cause Yarn to abort`,
     type: SettingsType.BOOLEAN,
     default: true,
   },
@@ -521,7 +536,7 @@ export interface ConfigurationValueMap {
   caFilePath: PortablePath | null;
   enableStrictSsl: boolean;
 
-  logFilters: Array<miscUtils.ToMapValue<{code?: string, text?: string, level?: formatUtils.LogLevel | null}>>;
+  logFilters: Array<miscUtils.ToMapValue<{code?: string, text?: string, pattern?: string, level?: formatUtils.LogLevel | null}>>;
 
   // Settings related to telemetry
   enableTelemetry: boolean;
@@ -530,6 +545,7 @@ export interface ConfigurationValueMap {
 
   // Settings related to security
   enableScripts: boolean;
+  enableStrictSettings: boolean;
   enableImmutableCache: boolean;
   checksumBehavior: string;
 
@@ -899,12 +915,7 @@ export class Configuration {
     const environmentSettings = getEnvironmentSettings();
     delete environmentSettings.rcFilename;
 
-    const rcFiles: Array<{
-      path: PortablePath;
-      cwd: PortablePath;
-      data: any;
-      strict?: boolean
-    }> = await Configuration.findRcFiles(startingCwd);
+    const rcFiles = await Configuration.findRcFiles(startingCwd);
 
     const homeRcFile = await Configuration.findHomeRcFile();
     if (homeRcFile) {
@@ -998,8 +1009,8 @@ export class Configuration {
 
       const dynamicPlugins = new Set();
 
-      const importPlugin = (pluginPath: PortablePath, source: string) => {
-        const {factory, name} = miscUtils.dynamicRequire(npath.fromPortablePath(pluginPath));
+      const importPlugin = async (pluginPath: PortablePath, source: string) => {
+        const {factory, name} = miscUtils.dynamicRequire(pluginPath);
 
         // Prevent plugin redefinition so that the ones declared deeper in the
         // filesystem always have precedence over the ones below.
@@ -1015,8 +1026,8 @@ export class Configuration {
           }
         };
 
-        const plugin = miscUtils.prettifySyncErrors(() => {
-          return getDefault(factory(pluginRequire));
+        const plugin = await miscUtils.prettifyAsyncErrors(async () => {
+          return getDefault(await factory(pluginRequire));
         }, message => {
           return `${message} (when initializing ${name}, defined in ${source})`;
         });
@@ -1030,7 +1041,7 @@ export class Configuration {
       if (environmentSettings.plugins) {
         for (const userProvidedPath of environmentSettings.plugins.split(`;`)) {
           const pluginPath = ppath.resolve(startingCwd, npath.toPortablePath(userProvidedPath));
-          importPlugin(pluginPath, `<environment>`);
+          await importPlugin(pluginPath, `<environment>`);
         }
       }
 
@@ -1046,7 +1057,7 @@ export class Configuration {
             : userPluginEntry;
 
           const pluginPath = ppath.resolve(cwd, npath.toPortablePath(userProvidedPath));
-          importPlugin(pluginPath, path);
+          await importPlugin(pluginPath, path);
         }
       }
     }
@@ -1070,7 +1081,12 @@ export class Configuration {
 
   static async findRcFiles(startingCwd: PortablePath) {
     const rcFilename = getRcFilename();
-    const rcFiles = [];
+    const rcFiles: Array<{
+      path: PortablePath;
+      cwd: PortablePath;
+      data: any;
+      strict?: boolean
+    }> = [];
 
     let nextCwd = startingCwd;
     let currentCwd = null;
@@ -1245,7 +1261,9 @@ export class Configuration {
   }
 
   use(source: string, data: {[key: string]: unknown}, folder: PortablePath, {strict = true, overwrite = false}: {strict?: boolean, overwrite?: boolean} = {}) {
-    for (const key of Object.keys(data)) {
+    strict = strict && this.get(`enableStrictSettings`);
+
+    for (const key of [`enableStrictSettings`, ...Object.keys(data)]) {
       const value = data[key];
       if (typeof value === `undefined`)
         continue;
@@ -1283,18 +1301,23 @@ export class Configuration {
         throw error;
       }
 
+      if (key === `enableStrictSettings` && source !== `<environment>`) {
+        strict = parsed as boolean;
+        continue;
+      }
+
       if (definition.type === SettingsType.MAP) {
         const previousValue = this.values.get(key) as Map<string, any>;
         this.values.set(key, new Map(overwrite
           ? [...previousValue, ...parsed as Map<string, any>]
-          : [...parsed as Map<string, any>, ...previousValue]
+          : [...parsed as Map<string, any>, ...previousValue],
         ));
         this.sources.set(key, `${this.sources.get(key)}, ${source}`);
       } else if (definition.isArray && definition.concatenateValues) {
         const previousValue = this.values.get(key) as Array<unknown>;
         this.values.set(key, overwrite
           ? [...previousValue, ...parsed as Array<unknown>]
-          : [...parsed as Array<unknown>, ...previousValue]
+          : [...parsed as Array<unknown>, ...previousValue],
         );
         this.sources.set(key, `${this.sources.get(key)}, ${source}`);
       } else {
@@ -1402,7 +1425,7 @@ export class Configuration {
 
     const registerPackageExtension = (descriptor: Descriptor, extensionData: PackageExtensionData, {userProvided = false}: {userProvided?: boolean} = {}) => {
       if (!semverUtils.validRange(descriptor.range))
-        throw new Error(`Only semver ranges are allowed as keys for the lockfileExtensions setting`);
+        throw new Error(`Only semver ranges are allowed as keys for the packageExtensions setting`);
 
       const extension = new Manifest();
       extension.load(extensionData, {yamlCompatibilityMode: true});

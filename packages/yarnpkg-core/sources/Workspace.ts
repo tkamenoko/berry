@@ -64,7 +64,6 @@ export class Workspace {
     const patterns = this.manifest.workspaceDefinitions.map(({pattern}) => pattern);
 
     const relativeCwds = await globby(patterns, {
-      absolute: true,
       cwd: npath.fromPortablePath(this.cwd),
       expandDirectories: false,
       onlyDirectories: true,
@@ -98,7 +97,7 @@ export class Workspace {
     if (protocol === WorkspaceResolver.protocol && ppath.normalize(pathname as PortablePath) === this.relativeCwd)
       return true;
 
-    if (protocol === WorkspaceResolver.protocol && pathname === `*`)
+    if (protocol === WorkspaceResolver.protocol && (pathname === `*` || pathname === `^` || pathname === `~`))
       return true;
 
     const semverRange = semverUtils.validRange(pathname);

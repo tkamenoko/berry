@@ -1,31 +1,31 @@
 {
   "name": "@yarnpkg/plugin-version",
-  "version": "3.0.0-rc.2",
+  "version": "3.0.1-rc.6",
   "license": "BSD-2-Clause",
   "main": "./sources/index.ts",
   "dependencies": {
-    "@yarnpkg/fslib": "workspace:^2.5.0-rc.2",
-    "@yarnpkg/libui": "workspace:^2.1.2-rc.2",
-    "@yarnpkg/parsers": "workspace:^2.3.1-rc.2",
-    "clipanion": "^3.0.0-rc.10",
+    "@yarnpkg/fslib": "workspace:^",
+    "@yarnpkg/libui": "workspace:^",
+    "@yarnpkg/parsers": "workspace:^",
+    "clipanion": "^3.0.1",
     "ink": "^3.0.8",
+    "lodash": "^4.17.15",
     "react": "^16.13.1",
     "semver": "^7.1.2",
     "tslib": "^1.13.0"
   },
   "peerDependencies": {
-    "@yarnpkg/cli": "^3.0.0-rc.2",
-    "@yarnpkg/core": "^3.0.0-rc.2",
-    "@yarnpkg/plugin-pack": "^3.0.0-rc.2"
+    "@yarnpkg/cli": "workspace:^",
+    "@yarnpkg/core": "workspace:^"
   },
   "devDependencies": {
+    "@types/lodash": "^4.14.136",
     "@types/react": "^16.8.0",
     "@types/semver": "^7.1.0",
-    "@yarnpkg/builder": "workspace:*",
-    "@yarnpkg/cli": "workspace:*",
-    "@yarnpkg/core": "workspace:*",
-    "@yarnpkg/plugin-pack": "workspace:*",
-    "typescript": "^4.3.2"
+    "@yarnpkg/builder": "workspace:^",
+    "@yarnpkg/cli": "workspace:^",
+    "@yarnpkg/core": "workspace:^",
+    "typescript": "^4.4.2"
   },
   "scripts": {
     "build:plugin-version": "builder build plugin",
@@ -48,5 +48,5 @@
   "engines": {
     "node": ">=12 <14 || 14.2 - 14.9 || >14.10.0"
   },
-  "stableVersion": "2.2.1"
+  "stableVersion": "3.0.0"
 }

@@ -15,7 +15,7 @@ yarn init -2
 - Add typescript and enable [VSCode integration](/getting-started/editor-sdks):
 ```sh
 yarn add --dev typescript
-yarn dlx @yarnpkg/pnpify --sdk vscode
+yarn dlx @yarnpkg/sdks vscode
 ```
 
 - You can optionally enable [Yarn's TypeScript plugin](https://github.com/yarnpkg/berry/tree/master/packages/plugin-typescript), which helps manage `@types/*` dependencies automatically.
@@ -55,4 +55,5 @@ nodeLinker: node-modules
 pnpIgnorePatterns:
   - ./nm-packages/**
 ```
-- You can now run `cd nm-package/myproj && yarn install` and the project will be isolated from your pnp root. 
+- Run `yarn` to apply `pnpIgnorePatterns` in the repo root.
+- Run `cd nm-packages/myproj && yarn` to install the now isolated project.
